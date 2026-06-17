@@ -1,0 +1,118 @@
+{
+  "expo": {
+    "name": "QuickBite Rider",
+    "slug": "riderApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "riderapp",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ff5a00",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "package": "com.herridez.riderApp",
+      "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAp9uH5jjHOB4jJonsmLP43dImnug2WJ9E"
+        }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.herridez.riderApp",
+      "config": {
+        "googleMapsApiKey": "AIzaSyB9sygTijkwxyA0y4prphn4Po2YHipyMk0"
+      }
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "newArchEnabled": false
+          },
+          "ios": {
+            "newArchEnabled": false
+          }
+        }
+      ],
+      "expo-router",
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "AIzaSyAp9uH5jjHOB4jJonsmLP43dImnug2WJ9E",
+          "iosGoogleMapsApiKey": "AIzaSyB9sygTijkwxyA0y4prphn4Po2YHipyMk0"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "QuickBite Rider uses your location for delivery tracking and order assignment.",
+          "locationAlwaysAndWhenInUsePermission": "QuickBite Rider uses your location while delivering, including in the background.",
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ff5a00"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "QuickBite Rider needs photo access to upload KYC documents.",
+          "cameraPermission": "QuickBite Rider needs camera access to capture KYC documents."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ff5a00",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 76
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6d923d26-0ac5-4ec4-9d6e-626beaa7761d"
+      },
+      "googleMaps": {
+        "android": "AIzaSyAp9uH5jjHOB4jJonsmLP43dImnug2WJ9E",
+        "ios": "AIzaSyB9sygTijkwxyA0y4prphn4Po2YHipyMk0",
+        "geocoding": "AIzaSyCxoK3LptaTG8r4VJBPf9LH_bdCBbTenJI",
+        "places": "AIzaSyA8dfXiI-1J9373yl18v8NXTj8UNhTZUlg",
+        "routes": "AIzaSyBJDtg3umA1eVaG2BxfAgykE7_4taJN5Vc"
+      }
+    },
+    "owner": "herridez"
+  }
+}
