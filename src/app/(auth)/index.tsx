@@ -38,7 +38,14 @@ export default function LoginScreen() {
       await loginWithEmailPassword({ email: email.trim(), password });
       router.replace('/(tabs)');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Login failed');
+      const message = e instanceof Error ? e.message : 'Login failed';
+      setError(message);
+      if (message.toLowerCase().includes('pending admin approval')) {
+        router.push({
+          pathname: '/(auth)/pending-approval',
+          params: { email: email.trim() },
+        });
+      }
     } finally {
       setBusy(false);
     }

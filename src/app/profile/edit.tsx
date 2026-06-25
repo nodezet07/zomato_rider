@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { cardStyle, Layout } from '@/constants/layout';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { hasUploadedImage } from '@/lib/imageUtils';
+import { hasLocalImage, hasUploadedImage, imageStatusLabel } from '@/lib/imageUtils';
 import { isLocalImageUri, uploadRiderDocument } from '@/lib/apiUpload';
 import { pickDocumentImage, takeDocumentPhoto } from '@/lib/pickDocumentImage';
 import { fetchRiderMe, updateRiderProfile } from '@/services/riders';
@@ -88,10 +90,15 @@ function DocUpload({
 }) {
   const theme = useTheme();
   const uploaded = hasUploadedImage(value);
+  const selected = hasLocalImage(value);
+  const status = imageStatusLabel(value);
 
   async function onPick(fromCamera: boolean) {
     const uri = fromCamera ? await takeDocumentPhoto(label) : await pickDocumentImage(label);
-    if (uri) onChange(uri);
+    if (uri) {
+      if (__DEV__) console.log('[edit-profile] picked', { label, uri: uri.slice(0, 100) });
+      onChange(uri);
+    }
   }
 
   return (
@@ -105,13 +112,20 @@ function DocUpload({
               Uploaded
             </ThemedText>
           </View>
+        ) : selected ? (
+          <View style={[styles.uploadedBadge, { backgroundColor: theme.primarySoft }]}>
+            <Ionicons name="image-outline" size={14} color={theme.primary} />
+            <ThemedText style={{ color: theme.primary, fontSize: 11, fontFamily: Fonts.bold }}>
+              Selected
+            </ThemedText>
+          </View>
         ) : (
           <ThemedText type="small" themeColor="textSecondary">
-            Required
+            {status}
           </ThemedText>
         )}
       </View>
-      {uploaded && value ? (
+      {(uploaded || selected) && value ? (
         <Image source={{ uri: value }} style={styles.preview} resizeMode="cover" />
       ) : null}
       <View style={styles.docActions}>
@@ -179,11 +193,15 @@ export default function EditProfileScreen() {
         type: 'profileImage' | 'drivingLicense' | 'aadhaarCard',
       ) {
         if (!value) return undefined;
-        if (isLocalImageUri(value)) return uploadRiderDocument(type, value);
+        if (isLocalImageUri(value)) {
+          if (__DEV__) console.log('[edit-profile] uploading', type);
+          return uploadRiderDocument(type, value);
+        }
         if (hasUploadedImage(value)) return value;
         return undefined;
       }
 
+      if (__DEV__) console.log('[edit-profile] saving profile');
       const [resolvedProfile, resolvedLicense, resolvedAadhaar] = await Promise.all([
         resolveDoc(profileImage, 'profileImage'),
         resolveDoc(drivingLicense, 'drivingLicense'),
@@ -214,7 +232,10 @@ export default function EditProfileScreen() {
       Alert.alert('Saved', 'Profile updated successfully.');
       router.back();
     },
-    onError: (e) => Alert.alert('Save failed', e instanceof Error ? e.message : 'Try again'),
+    onError: (e) => {
+      if (__DEV__) console.error('[edit-profile] save failed', e);
+      Alert.alert('Save failed', e instanceof Error ? e.message : 'Try again');
+    },
   });
 
   function onSave() {
@@ -247,91 +268,101 @@ export default function EditProfileScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <SectionTitle title="Personal" />
-        <View style={[styles.block, cardStyle, { backgroundColor: theme.backgroundElement }]}>
-          <Field label="Full name" value={fullName} onChangeText={setFullName} placeholder="Your name" />
-          <Field
-            label="Mobile"
-            value={mobile}
-            onChangeText={setMobile}
-            placeholder="10-digit number"
-            keyboardType="phone-pad"
-          />
-          <View style={styles.field}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
+          nestedScrollEnabled>
+          <SectionTitle title="Personal" />
+          <View style={[styles.block, cardStyle, { backgroundColor: theme.backgroundElement }]}>
+            <Field label="Full name" value={fullName} onChangeText={setFullName} placeholder="Your name" />
+            <Field
+              label="Mobile"
+              value={mobile}
+              onChangeText={setMobile}
+              placeholder="10-digit number"
+              keyboardType="phone-pad"
+            />
+            <View style={styles.field}>
+              <ThemedText type="label" themeColor="textSecondary">
+                Email
+              </ThemedText>
+              <ThemedText style={styles.readOnly}>{email || '—'}</ThemedText>
+            </View>
+          </View>
+
+          <SectionTitle title="Vehicle" />
+          <View style={[styles.block, cardStyle, { backgroundColor: theme.backgroundElement }]}>
             <ThemedText type="label" themeColor="textSecondary">
-              Email
+              Type
             </ThemedText>
-            <ThemedText style={styles.readOnly}>{email || '—'}</ThemedText>
+            <View style={styles.chips}>
+              {VEHICLE_OPTIONS.map((v) => (
+                <Pressable
+                  key={v.value}
+                  onPress={() => setVehicleType(v.value)}
+                  style={[
+                    styles.chip,
+                    {
+                      borderColor: vehicleType === v.value ? theme.primary : theme.border,
+                      backgroundColor: vehicleType === v.value ? theme.primarySoft : theme.background,
+                    },
+                  ]}>
+                  <ThemedText
+                    style={{
+                      fontFamily: Fonts.bold,
+                      fontSize: 12,
+                      color: vehicleType === v.value ? theme.primary : theme.textSecondary,
+                    }}>
+                    {v.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+            <Field
+              label="Vehicle number"
+              value={vehicleNumber}
+              onChangeText={setVehicleNumber}
+              placeholder="MH12AB1234"
+              autoCapitalize="characters"
+            />
           </View>
-        </View>
 
-        <SectionTitle title="Vehicle" />
-        <View style={[styles.block, cardStyle, { backgroundColor: theme.backgroundElement }]}>
-          <ThemedText type="label" themeColor="textSecondary">
-            Type
-          </ThemedText>
-          <View style={styles.chips}>
-            {VEHICLE_OPTIONS.map((v) => (
-              <Pressable
-                key={v.value}
-                onPress={() => setVehicleType(v.value)}
-                style={[
-                  styles.chip,
-                  {
-                    borderColor: vehicleType === v.value ? theme.primary : theme.border,
-                    backgroundColor: vehicleType === v.value ? theme.primarySoft : theme.background,
-                  },
-                ]}>
-                <ThemedText
-                  style={{
-                    fontFamily: Fonts.bold,
-                    fontSize: 12,
-                    color: vehicleType === v.value ? theme.primary : theme.textSecondary,
-                  }}>
-                  {v.label}
-                </ThemedText>
-              </Pressable>
-            ))}
+          <SectionTitle title="KYC documents" />
+          <DocUpload label="Profile photo" value={profileImage} onChange={setProfileImage} />
+          <DocUpload label="Driving license" value={drivingLicense} onChange={setDrivingLicense} />
+          <DocUpload label="Aadhaar card" value={aadhaarCard} onChange={setAadhaarCard} />
+
+          <SectionTitle title="Bank for payouts" />
+          <View style={[styles.block, cardStyle, { backgroundColor: theme.backgroundElement }]}>
+            <Field
+              label="Account holder name"
+              value={accountHolderName}
+              onChangeText={setAccountHolderName}
+              placeholder="As per bank records"
+            />
+            <Field
+              label="Account number"
+              value={accountNumber}
+              onChangeText={setAccountNumber}
+              placeholder="Account number"
+              keyboardType="number-pad"
+            />
+            <Field
+              label="IFSC code"
+              value={ifscCode}
+              onChangeText={setIfscCode}
+              placeholder="SBIN0001234"
+              autoCapitalize="characters"
+            />
           </View>
-          <Field
-            label="Vehicle number"
-            value={vehicleNumber}
-            onChangeText={setVehicleNumber}
-            placeholder="MH12AB1234"
-            autoCapitalize="characters"
-          />
-        </View>
-
-        <SectionTitle title="KYC documents" />
-        <DocUpload label="Profile photo" value={profileImage} onChange={setProfileImage} />
-        <DocUpload label="Driving license" value={drivingLicense} onChange={setDrivingLicense} />
-        <DocUpload label="Aadhaar card" value={aadhaarCard} onChange={setAadhaarCard} />
-
-        <SectionTitle title="Bank for payouts" />
-        <View style={[styles.block, cardStyle, { backgroundColor: theme.backgroundElement }]}>
-          <Field
-            label="Account holder name"
-            value={accountHolderName}
-            onChangeText={setAccountHolderName}
-            placeholder="As per bank records"
-          />
-          <Field
-            label="Account number"
-            value={accountNumber}
-            onChangeText={setAccountNumber}
-            placeholder="Account number"
-            keyboardType="number-pad"
-          />
-          <Field
-            label="IFSC code"
-            value={ifscCode}
-            onChangeText={setIfscCode}
-            placeholder="SBIN0001234"
-            autoCapitalize="characters"
-          />
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={[styles.footer, { backgroundColor: theme.backgroundElement, borderTopColor: theme.border }]}>
         <Pressable
@@ -351,6 +382,7 @@ export default function EditProfileScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -360,7 +392,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   navTitle: { fontSize: 16, fontFamily: Fonts.extraBold },
-  scroll: { padding: Layout.screenPadding, paddingBottom: Spacing.four },
+  scroll: { padding: Layout.screenPadding, paddingBottom: 280 },
   sectionTitle: { marginBottom: Spacing.two, marginTop: Spacing.one },
   block: { padding: Spacing.three, marginBottom: Spacing.three },
   field: { marginBottom: Spacing.three },

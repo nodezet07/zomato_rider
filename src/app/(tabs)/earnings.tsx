@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { View, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { View, StyleSheet, RefreshControl, ActivityIndicator, Alert, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -16,6 +16,8 @@ import {
   fetchEarningsSummary,
   fetchPayoutHistory,
   fetchRiderEarnings,
+  fetchWithdrawalRequests,
+  requestWithdrawal,
   RIDER_FEE,
 } from '@/services/riders';
 
@@ -41,13 +43,30 @@ export default function EarningsScreen() {
     queryKey: ['rider', 'payouts'],
     queryFn: () => fetchPayoutHistory(1, 10),
   });
+  const withdrawalsQ = useQuery({
+    queryKey: ['rider', 'withdrawals'],
+    queryFn: () => fetchWithdrawalRequests(1, 10),
+  });
+
+  const withdrawMut = useMutation({
+    mutationFn: (amount: number) => requestWithdrawal(amount),
+    onSuccess: () => {
+      withdrawalsQ.refetch();
+      summaryQ.refetch();
+      Alert.alert('Withdrawal requested', 'Admin will review your request.');
+    },
+    onError: (err: Error) => Alert.alert('Withdrawal failed', err.message),
+  });
 
   const earnings = earningsQ.data;
   const summary = summaryQ.data;
   const history = historyQ.data?.orders ?? [];
   const payouts = payoutsQ.data?.payouts ?? [];
+  const withdrawals = withdrawalsQ.data?.requests ?? [];
+  const availableBalance = withdrawalsQ.data?.availableBalance ?? pendingAmount;
+  const perDelivery = summary?.earningPerDelivery ?? RIDER_FEE;
   const refreshing =
-    historyQ.isRefetching || earningsQ.isRefetching || summaryQ.isRefetching || payoutsQ.isRefetching;
+    historyQ.isRefetching || earningsQ.isRefetching || summaryQ.isRefetching || payoutsQ.isRefetching || withdrawalsQ.isRefetching;
 
   const pendingAmount = summary?.pendingPayout?.grossEarnings ?? 0;
   const paidAmount = summary?.totalPaidOut?.grossEarnings ?? 0;
@@ -64,12 +83,13 @@ export default function EarningsScreen() {
               earningsQ.refetch();
               summaryQ.refetch();
               payoutsQ.refetch();
+              withdrawalsQ.refetch();
             }}
           />
         }>
         <ScreenHeader
           title="Earnings"
-          subtitle={`₹${RIDER_FEE} per completed delivery`}
+          subtitle={`₹${perDelivery} per completed delivery`}
         />
 
         <LinearGradient
@@ -171,6 +191,53 @@ export default function EarningsScreen() {
           </View>
         )}
 
+        {availableBalance > 0 && (
+          <Pressable
+            style={[styles.withdrawBtn, { backgroundColor: theme.primary }]}
+            onPress={() => {
+              Alert.alert(
+                'Request withdrawal',
+                `Withdraw ₹${availableBalance} to your bank account?`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Request', onPress: () => withdrawMut.mutate(availableBalance) },
+                ],
+              );
+            }}>
+            <ThemedText style={styles.withdrawBtnText}>
+              Request withdrawal (₹{availableBalance})
+            </ThemedText>
+          </Pressable>
+        )}
+
+        {withdrawals.length > 0 && (
+          <>
+            <View style={styles.sectionHead}>
+              <ThemedText style={styles.sectionTitle}>Withdrawal requests</ThemedText>
+            </View>
+            <View style={[styles.listCard, cardStyle, { backgroundColor: theme.backgroundElement }]}>
+              {withdrawals.map((w, i) => (
+                <View
+                  key={w._id}
+                  style={[
+                    styles.historyRow,
+                    i < withdrawals.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border },
+                  ]}>
+                  <View style={styles.historyLeft}>
+                    <ThemedText style={styles.historyId}>₹{w.amount}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {formatPayoutStatus(w.status)}
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {formatDate(w.createdAt)}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         {payouts.length > 0 ? (
           <>
             <View style={styles.sectionHead}>
@@ -188,7 +255,7 @@ export default function EarningsScreen() {
                     <Ionicons name="cash-outline" size={18} color={theme.primary} />
                   </View>
                   <View style={styles.historyLeft}>
-                    <ThemedText style={styles.historyId}>₹{p.amount}</ThemedText>
+                    <ThemedText style={styles.historyId}>₹{p.netPayable ?? p.amount ?? 0}</ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
                       {formatPayoutStatus(p.status)}
                     </ThemedText>
@@ -335,4 +402,16 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
   },
   emptySub: { textAlign: 'center' },
+  withdrawBtn: {
+    marginHorizontal: Layout.screenPadding,
+    marginBottom: Spacing.three,
+    borderRadius: Layout.cardRadius,
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+  },
+  withdrawBtnText: {
+    color: '#fff',
+    fontFamily: Fonts.bold,
+    fontSize: 15,
+  },
 });

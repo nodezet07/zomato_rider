@@ -40,9 +40,17 @@ export async function registerWithEmailPassword(input: {
   mobile?: string;
   vehicleType?: string;
   vehicleNumber?: string;
+  drivingLicenseUri?: string;
+  aadhaarCardUri?: string;
+  profileImageUri?: string;
+  bankAccountDetails?: {
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+  };
 }) {
-  await registerRider(input);
-  return loginWithEmailPassword({ email: input.email.trim(), password: input.password });
+  const body = await registerRider(input);
+  return body.data;
 }
 
 export async function logout() {

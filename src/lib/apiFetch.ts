@@ -1,4 +1,5 @@
-import { API_URL } from '@/config/env';
+import { getApiUrl } from '@/config/env';
+import { isRNFormData } from '@/lib/multipart';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/storage';
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
@@ -12,7 +13,7 @@ async function refreshTokens(): Promise<string | null> {
   if (!refreshToken) return null;
 
   try {
-    const res = await fetch(`${API_URL}/auth/refresh-token`, {
+    const res = await fetch(`${getApiUrl()}/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -36,9 +37,15 @@ export async function apiFetch<T = unknown>(
   path: string,
   init?: RequestInit & { _retry?: boolean },
 ): Promise<T> {
-  const url = path.startsWith('http') ? path : `${API_URL}${path}`;
+  const url = path.startsWith('http') ? path : `${getApiUrl()}${path}`;
   const headers = new Headers(init?.headers ?? {});
-  if (!headers.has('Content-Type') && init?.body) headers.set('Content-Type', 'application/json');
+  const hasFormDataBody = isRNFormData(init?.body);
+  if (!headers.has('Content-Type') && init?.body && !hasFormDataBody) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (__DEV__ && hasFormDataBody) {
+    console.warn('[apiFetch] multipart body detected — use apiUploadForm instead of apiFetch');
+  }
 
   const accessToken = await getAccessToken();
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
@@ -77,7 +84,9 @@ export async function apiFetch<T = unknown>(
   }
 
   const retryHeaders = new Headers(init?.headers ?? {});
-  if (!retryHeaders.has('Content-Type') && init?.body) retryHeaders.set('Content-Type', 'application/json');
+  if (!retryHeaders.has('Content-Type') && init?.body && !hasFormDataBody) {
+    retryHeaders.set('Content-Type', 'application/json');
+  }
   retryHeaders.set('Authorization', `Bearer ${newAccessToken}`);
   const retryRes = await fetch(url, { ...init, headers: retryHeaders, _retry: true } as RequestInit & {
     _retry?: boolean;

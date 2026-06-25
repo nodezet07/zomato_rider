@@ -1,57 +1,94 @@
-import { Platform } from 'react-native';
-
-import { API_URL } from '@/config/env';
+import { getApiUrl } from '@/config/env';
 import { getAccessToken } from '@/lib/storage';
+import {
+  isRNFormData,
+  isLocalImageUri,
+  logFormDataParts,
+  toUploadFile,
+} from '@/lib/multipart';
 
-export async function apiUploadForm<T = unknown>(
-  path: string,
-  formData: FormData,
-): Promise<T> {
-  const url = path.startsWith('http') ? path : `${API_URL}${path}`;
-  const headers: Record<string, string> = {};
-  const accessToken = await getAccessToken();
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+type UploadError = Error & { status?: number; data?: unknown };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
-
-  const text = await res.text();
+function parseUploadResponse(xhr: XMLHttpRequest) {
+  const text = xhr.responseText;
   const data = text ? JSON.parse(text) : null;
+  if (xhr.status < 200 || xhr.status >= 300) {
+    const err = new Error(
+      (data as { message?: string })?.message ?? `Upload failed: ${xhr.status}`,
+    ) as UploadError;
+    err.status = xhr.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
 
-  if (!res.ok) {
-    throw new Error((data as { message?: string })?.message ?? `Upload failed: ${res.status}`);
+/** Multipart upload via XHR — more reliable than fetch for RN FormData. */
+export async function apiUploadForm<T = unknown>(path: string, formData: FormData): Promise<T> {
+  if (!isRNFormData(formData)) {
+    throw new Error(
+      'Unsupported FormData implementation. Rebuild the app; multipart requires React Native FormData.',
+    );
   }
 
-  return data as T;
+  const url = path.startsWith('http') ? path : `${getApiUrl()}${path}`;
+  logFormDataParts(formData, `POST ${url}`);
+
+  const accessToken = await getAccessToken();
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  if (__DEV__) {
+    console.log('[apiUpload] starting XHR upload', { url, hasAuth: Boolean(accessToken) });
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    Object.entries(headers).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+
+    xhr.onload = () => {
+      try {
+        if (__DEV__) console.log('[apiUpload] done', { status: xhr.status });
+        resolve(parseUploadResponse(xhr) as T);
+      } catch (e) {
+        if (__DEV__) console.error('[apiUpload] response error', e);
+        reject(e);
+      }
+    };
+
+    xhr.onerror = () => {
+      if (__DEV__) console.error('[apiUpload] network error');
+      reject(new Error('Network error during file upload'));
+    };
+
+    xhr.onabort = () => reject(new Error('Upload aborted'));
+
+    try {
+      xhr.send(formData);
+    } catch (e) {
+      if (__DEV__) console.error('[apiUpload] xhr.send failed', e);
+      reject(e instanceof Error ? e : new Error('Failed to send upload'));
+    }
+  });
 }
 
 export async function uploadRiderDocument(
   type: 'profileImage' | 'drivingLicense' | 'aadhaarCard',
   localUri: string,
 ): Promise<string> {
-  const name = `${type}.jpg`;
+  if (__DEV__) console.log('[apiUpload] uploadRiderDocument', { type, uri: localUri.slice(0, 100) });
+
   const formData = new FormData();
   formData.append('type', type);
-  formData.append('file', {
-    uri: localUri,
-    name,
-    type: 'image/jpeg',
-  } as unknown as Blob);
+  formData.append('file', toUploadFile(localUri, `${type}.jpg`) as unknown as Blob);
 
-  const body = await apiUploadForm<{ data?: { url?: string } }>(
-    '/riders/upload-document',
-    formData,
-  );
+  const body = await apiUploadForm<{ data?: { url?: string } }>('/riders/upload-document', formData);
 
   const url = body.data?.url;
   if (!url) throw new Error('Upload did not return a URL');
+  if (__DEV__) console.log('[apiUpload] uploaded', { type, url: url.slice(0, 80) });
   return url;
 }
 
-export function isLocalImageUri(value?: string | null): boolean {
-  if (!value) return false;
-  return value.startsWith('file://') || value.startsWith('content://');
-}
+export { isLocalImageUri };

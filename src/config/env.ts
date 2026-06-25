@@ -3,12 +3,13 @@ import { Platform } from 'react-native';
 
 const isProduction = !__DEV__;
 
-const PRODUCTION_API_URL = 'https://example.com/api/v1';
-const PRODUCTION_SOCKET_URL = 'https://example.com';
+const PRODUCTION_API_URL = 'https://zomato-backend-pt66.onrender.com/api/v1';
+const PRODUCTION_SOCKET_URL = 'https://zomato-backend-pt66.onrender.com';
 
 const DEFAULT_BACKEND_PORT = 5000;
-const FALLBACK_LAN_HOST = '192.168.1.101';
-const ANDROID_EMULATOR_HOST = '10.0.2.2';
+const FALLBACK_LAN_HOST = '192.168.1.100';
+const ANDROID_EMULATOR_HOST =
+  process.env.EXPO_PUBLIC_ANDROID_API_HOST?.trim() || FALLBACK_LAN_HOST;
 
 function isAndroidEmulator(): boolean {
   if (Platform.OS !== 'android') return false;

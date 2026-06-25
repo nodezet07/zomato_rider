@@ -8,6 +8,7 @@
     "scheme": "riderapp",
     "userInterfaceStyle": "automatic",
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#ff5a00",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -50,7 +51,8 @@
         "expo-build-properties",
         {
           "android": {
-            "newArchEnabled": false
+            "newArchEnabled": false,
+            "usesCleartextTraffic": true
           },
           "ios": {
             "newArchEnabled": false

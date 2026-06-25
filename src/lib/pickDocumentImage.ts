@@ -39,15 +39,15 @@ export async function pickDocumentImage(label: string): Promise<string | null> {
     mediaTypes: ['images'],
     allowsEditing: true,
     quality: 0.5,
-    base64: true,
   });
 
-  if (result.canceled || !result.assets[0]?.base64) {
+  if (result.canceled || !result.assets[0]?.uri) {
     return null;
   }
 
-  const mime = result.assets[0].mimeType ?? 'image/jpeg';
-  return `data:${mime};base64,${result.assets[0].base64}`;
+  const uri = result.assets[0].uri;
+  if (__DEV__) console.log('[pickDocumentImage] gallery', { label, uri: uri.slice(0, 100) });
+  return uri;
 }
 
 export async function takeDocumentPhoto(label: string): Promise<string | null> {
@@ -66,13 +66,13 @@ export async function takeDocumentPhoto(label: string): Promise<string | null> {
   const result = await ImagePicker.launchCameraAsync({
     allowsEditing: true,
     quality: 0.5,
-    base64: true,
   });
 
-  if (result.canceled || !result.assets[0]?.base64) {
+  if (result.canceled || !result.assets[0]?.uri) {
     return null;
   }
 
-  const mime = result.assets[0].mimeType ?? 'image/jpeg';
-  return `data:${mime};base64,${result.assets[0].base64}`;
+  const uri = result.assets[0].uri;
+  if (__DEV__) console.log('[pickDocumentImage] camera', { label, uri: uri.slice(0, 100) });
+  return uri;
 }
